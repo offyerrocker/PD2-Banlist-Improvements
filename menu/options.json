@@ -53,6 +53,26 @@
 			"value" : "log_results"
 		},
 		{
+			"type" : "toggle",
+			"id" : "sbl_record_additional_ban_data",
+			"title" : "sbl_record_additional_ban_data_title",
+			"description" : "sbl_record_additional_ban_data_desc",
+			"callback" : "callback_sbl_record_additional_ban_data",
+			"value" : "record_additional_ban_data"
+		},
+		{
+			"type" : "multiplechoice",
+			"id" : "sbl_link_behavior",
+			"title" : "sbl_link_behavior_title",
+			"description" : "sbl_link_behavior_desc",
+			"callback" : "callback_sbl_link_behavior",
+			"items" : [
+				"sbl_link_behavior_overlay",
+				"sbl_link_behavior_clipboard"
+			],
+			"value" : "link_behavior"
+		},
+		{
 			"DISABLED_type" : "toggle",
 			"id" : "sbl_search_steam_profiles",
 			"title" : "sbl_search_steam_profiles_title",

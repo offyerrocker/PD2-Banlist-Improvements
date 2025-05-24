@@ -1,5 +1,5 @@
 {
-	"sbl_options_title" : "Search Banlist..."
+	"sbl_options_title" : "[Searchable Banlist Mod Options]"
 	"sbl_is_case_sensitive_title" : "Case-Sensitive",
 	"sbl_is_case_sensitive_desc" : "If true, the search will distinguish between uppercase and lowercase letters.",
 	"sbl_require_match_all_title" : "Must Match All Keywords",
@@ -24,5 +24,27 @@
 	"sbl_prompt_search_failure_desc" : "No banned users found with given search parameters",
 	"sbl_prompt_show_all_title" : "Ban List",
 	"sbl_prompt_missing_qki_title" : "Missing Dependency Mod",
-	"sbl_prompt_missing_qki_desc" : "You must have TdlQ's mod, \"Quick Keyboard Input\" ( https://pd2mods.z77.fr/quick_keyboard_input.html ) in order to use the search function of this mod!"
+	"sbl_prompt_missing_qki_desc" : "You must have TdlQ's mod, \"Quick Keyboard Input\" ( https://pd2mods.z77.fr/quick_keyboard_input.html ) in order to use the search function of this mod!",
+	"sbl_dialog_ok" : "[OK]",
+	"sbl_dialog_banlist_title" : "Banned Users ($CURRENT/$TOTAL)",
+	"sbl_dialog_banlist_desc" : "Select a user to view more options.\nShowing entries $MIN - $MAX (out of $TOTAL.)",
+	"sbl_dialog_banlist_entry_title" : "Banned User Information",
+	"sbl_dialog_banlist_entry_desc" : "Name: $NAME\nID: $ID\nDate Banned: $DATE",
+	"sbl_dialog_button_open_profile_steam" : "[Open Steam Profile]",
+	"sbl_dialog_button_open_profile_fbi" : "[Open FBI Files]",
+	"sbl_dialog_button_unban_user" : "[Unban User]",
+	"sbl_dialog_pageprev" : "[Previous]",
+	"sbl_dialog_pagenext" : "[Next]",
+	"sbl_dialog_urlcopy_success_desc" : "Copied URL to clipboard:\n$URL",
+	"sbl_dialog_banlist_entry_no_data" : "(no data)",
+	"sbl_dialog_success" : "Success",
+	"sbl_dialog_failure" : "Error",
+	"sbl_dialog_unban_success_desc" : "Removed $NAME from the ban list.",
+	"sbl_dialog_unban_failure_desc" : "Could not remove $NAME from the ban list. Please refresh and try again.",
+	"sbl_record_additional_ban_data_title" : "Track time of ban",
+	"sbl_record_additional_ban_data_desc" : "Allows also recording the timestamp of the ban while this option is enabled.",
+	"sbl_link_behavior_title" : "Links/URLs",
+	"sbl_link_behavior_desc" : "Choose how to open Steam/FBI profile links",
+	"sbl_link_behavior_overlay" : "Open in overlay",
+	"sbl_link_behavior_clipboard" : "Copy to clipboard"
 }

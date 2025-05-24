@@ -1,13 +1,19 @@
 _G.SearchableBanList = SearchableBanList or {}
 SearchableBanList.mod_path = ModPath
+SearchableBanList.settings_path = SavePath .. "searchable_ban_list_settings.json"
 SearchableBanList.menu_path = SearchableBanList.mod_path .. "menu/options.json"
 SearchableBanList.default_localization_path = SearchableBanList.mod_path .. "localization/english.json"
-SearchableBanList.default_options = { --these options are not saved between sessions
+SearchableBanList.FBI_PROFILES_URL = tweak_data.gui.fbi_files_webpage .. "/suspect/$id64"
+SearchableBanList.STEAM_PROFILES_URL = "https://steamcommunity.com/profiles/$id64"
+SearchableBanList.MAX_ENTRIES_PER_PAGE = 10
+SearchableBanList.default_options = { --these options are saved between sessions
 	case_sensitive = false,
 	search_id64s = false,
 	show_id64s = true,
 	require_match_all = false,
 	substitute_lookalike_characters = true,
+	record_additional_ban_data = false, -- if true, stores timestamp of ban (not implemented)
+	link_behavior = 1, -- 1: open in overlay; 2: copy link to clipboard
 	log_results = false
 }
 SearchableBanList.search_options = table.deep_map_copy(SearchableBanList.default_options)
@@ -19,7 +25,29 @@ SearchableBanList._lookalike_characters = {
 }
 
 function SearchableBanList:OutputResultsToLog(...)
+	if self.search_options.log_results then
+		return self:_OutputResultsToLog(...)
+	end
+end
+function SearchableBanList:_OutputResultsToLog(...)
 	log(...)
+end
+
+function SearchableBanList:OpenURL(url)
+	if self.search_options.link_behavior == 1 then
+		managers.network.account:overlay_activate("url", url)
+	else
+		Application:set_clipboard(url)
+		QuickMenu:new(managers.localization:text("sbl_dialog_success"),managers.localization:text("sbl_dialog_urlcopy_success_desc",{URL=url}),
+			{
+				text = managers.localization:text("sbl_dialog_ok"),
+				is_focused_button = true,
+				is_cancel_button = true,
+				callback = cb_back
+			},
+			true
+		)
+	end
 end
 
 function SearchableBanList:SubstituteSimilarCharacters(str)
@@ -78,7 +106,7 @@ function SearchableBanList:DoSearchInList(raw_search_text)
 			end
 			
 			if is_match then 
-				table.insert(search_results,#search_results + 1,i)
+				table.insert(search_results,#search_results + 1,banned_user)
 			end
 			
 		end
@@ -100,15 +128,290 @@ function SearchableBanList:ShowMissingQKIPrompt()
 			callback = nil
 		}
 	},true)
-	
 end
 
-function SearchableBanList:ShowSearchResults(results,search_string)
-	local ok_button = {
-		text = managers.localization:text("menu_ok"),
+function SearchableBanList:OnSearchEntryCallback(search_string)
+	local results = self:DoSearchInList(search_string)
+	if #results > 0 then
+	
+		self:OutputResultsToLog("============")
+		self:OutputResultsToLog("| Ban List: |")
+		for _,user in ipairs(results) do 
+			local s = "|\t" .. user.name .. "\t" .. user.identifier
+			if user.timestamp then
+				s = s .. "\t" .. os.date("%x",user.timestamp)
+			end
+			self:OutputResultsToLog(s)
+		end
+		self:OutputResultsToLog("============")
+		
+		self:ShowEntries(results,1)
+	else
+		self:OutputResultsToLog("No results found for:" .. tostring(search_string))
+		QuickMenu:new("No results","No bans found by search string: " .. tostring(search_string),{
+			{
+				text = managers.localization:text("menu_ok"),
+				is_focused_button = true,
+				is_cancel_button = true,
+				callback = nil
+			}
+		},true)
+	end
+end
+
+Hooks:Add("LocalizationManagerPostInit", "LocalizationManagerPostInit_SBL", function( loc )
+	if not BeardLib then 
+		--local loc = managers.localization --debug reasons
+		loc:load_localization_file( SearchableBanList.default_localization_path )
+	end
+end)
+
+Hooks:Add( "MenuManagerInitialize", "MenuManagerInitialize_SBL", function(menu_manager)
+	MenuCallbackHandler.callback_sbl_is_case_sensitive = function(self,item)
+		SearchableBanList.search_options.case_sensitive = item:value() == "on"
+		SearchableBanList:SaveSettings()
+	end
+	MenuCallbackHandler.callback_sbl_require_match_all = function(self,item)
+		SearchableBanList.search_options.require_match_all = item:value() == "on"
+		SearchableBanList:SaveSettings()
+	end
+	MenuCallbackHandler.callback_sbl_link_behavior = function(self,item)
+		SearchableBanList.search_options.link_behavior = tonumber(item:value())
+		SearchableBanList:SaveSettings()
+	end
+	MenuCallbackHandler.callback_sbl_substitute_lookalike_characters = function(self,item)
+		SearchableBanList.search_options.substitute_lookalike_characters = item:value() == "on"
+		SearchableBanList:SaveSettings()
+	end
+	MenuCallbackHandler.callback_sbl_search_id64s = function(self,item)
+		SearchableBanList.search_options.search_id64s = item:value() == "on"
+		SearchableBanList:SaveSettings()
+	end
+	MenuCallbackHandler.callback_sbl_show_id64s = function(self,item)
+		SearchableBanList.search_options.show_id64s = item:value() == "on"
+		SearchableBanList:SaveSettings()
+	end
+
+	MenuCallbackHandler.callback_sbl_log_results = function(self,item)
+		SearchableBanList.search_options.log_results = item:value() == "on"
+		SearchableBanList:SaveSettings()
+	end
+
+	MenuCallbackHandler.callback_sbl_record_additional_ban_data = function(self,item)
+		SearchableBanList.search_options.record_additional_ban_data = item:value() == "on"
+		SearchableBanList:SaveSettings()
+	end
+
+	MenuCallbackHandler.callback_sbl_show_all_bans = function(self)
+		if not managers.ban_list then 
+			log("[Searchable Ban List] Error: No ban list manager")
+			return
+		end
+		
+		local results = table.deep_map_copy(managers.ban_list._global.banned)
+		--[[
+		local results = {}
+		for i=1,51 do 
+			local s = "" 
+			for j = 1,1+math.random(25) do 
+				s = s .. string.char(65 + math.random(122-65))
+			end
+			results[i] = {
+				name = s,
+				identifier = math.random(12345679)
+			}
+		end
+		--]]
+		SearchableBanList:ShowEntries(results,1)
+	end
+
+	MenuCallbackHandler.callback_sbl_init_search = function(self)
+		if not _G.QuickKeyboardInput then 
+			SearchableBanList:ShowMissingQKIPrompt()
+			return
+		end
+		_G.QuickKeyboardInput:new(managers.localization:text("sbl_prompt_search_start_title"),managers.localization:text("sbl_prompt_search_start_desc"),"",callback(SearchableBanList,SearchableBanList,"OnSearchEntryCallback"),nil,true)
+	end
+	
+	SearchableBanList:LoadSettings()
+	MenuHelper:LoadFromJsonFile(SearchableBanList.menu_path, SearchableBanList, SearchableBanList.search_options)
+	
+end)
+
+function SearchableBanList:ShowEntries(page_data,page_num)
+	page_num = page_num or 1
+	local total_num_entries = #page_data
+	local total_num_pages = math.ceil(total_num_entries / self.MAX_ENTRIES_PER_PAGE)
+	local num_entries_this_page = total_num_entries - (self.MAX_ENTRIES_PER_PAGE * (page_num - 1))
+	
+	local page_start = self.MAX_ENTRIES_PER_PAGE * (page_num - 1)
+	local page_finish = page_start + math.min(total_num_entries - page_start,self.MAX_ENTRIES_PER_PAGE)
+	
+	if total_num_entries == 0 then
+		-- assume this check is handled elsewhere
+		--return
+	end
+	local options = {}
+	local cancel_button = { -- "ok"/"cancel"/"back" button (end transaction)
+		text = managers.localization:text("sbl_dialog_ok"),
 		is_focused_button = true,
 		is_cancel_button = true,
 		callback = nil
+	}
+	
+	local function insert_user_callback(banned_data)
+		local button_title
+		
+		if self.search_options.show_id64s then
+			button_title = string.format("%s : %s",banned_data.name,banned_data.identifier)
+		else
+			button_title = banned_data.name
+		end
+		
+		table.insert(options,#options+1,{
+			text = button_title,
+			callback = function() self:ShowBannedEntry(banned_data,function() self:ShowEntries(page_data,page_num) end) end
+		})
+	end
+	
+	for i=page_start,page_finish-1,1 do 
+		local banned_data = page_data[i + 1]
+		if banned_data then
+			insert_user_callback(banned_data)
+		else
+			-- no more banned users to add
+			break
+		end
+	end
+	
+	if page_num > 1 then
+		-- "page back" button
+		table.insert(options,#options+1,{
+			text = managers.localization:text("sbl_dialog_pageprev"),
+			callback = function() self:ShowEntries(page_data,page_num - 1) end
+		})
+	end
+	if page_num < total_num_pages then
+		-- "page fwd" button
+		table.insert(options,#options+1,{
+			text = managers.localization:text("sbl_dialog_pagenext"),
+			callback = function() self:ShowEntries(page_data,page_num + 1) end
+		})
+	end
+	
+	-- insert cancel button
+	table.insert(options,#options+1,cancel_button)
+	
+	QuickMenu:new(managers.localization:text("sbl_dialog_banlist_title",{CURRENT=page_num,TOTAL=total_num_pages}),managers.localization:text("sbl_dialog_banlist_desc",{MIN=page_start + 1,MAX=page_finish,TOTAL=total_num_entries}),options,true)
+end
+
+function SearchableBanList:ShowBannedEntry(data,cb_back)
+	local name = data.name
+	local identifier = data.identifier
+	
+	local cancel_button = { -- "ok"/"cancel"/"back" button (end transaction)
+		text = managers.localization:text("sbl_dialog_ok"),
+		is_focused_button = true,
+		is_cancel_button = true,
+		callback = cb_back
+	}
+	
+	local function show_unbanned_dialog(name,success)
+		if success then 
+			QuickMenu:new(managers.localization:text("sbl_dialog_success"),managers.localization:text("sbl_dialog_unban_success_desc",{NAME=name}),{
+				cancel_button
+			},true)
+		else
+			QuickMenu:new(managers.localization:text("sbl_dialog_failure"),managers.localization:text("sbl_dialog_unban_failure_desc",{NAME=name}),{
+				cancel_button
+			},true)
+		end
+	end
+
+	local options = {
+		{
+			text = managers.localization:text("sbl_dialog_button_open_profile_steam"),
+			callback = function() self:OpenURL(string.gsub(self.STEAM_PROFILES_URL,"$id64",identifier)); self:ShowBannedEntry(data,cb_back) end
+		},
+		{
+			text = managers.localization:text("sbl_dialog_button_open_profile_fbi"),
+			callback = function() self:OpenURL(string.gsub(self.FBI_PROFILES_URL,"$id64",identifier)); self:ShowBannedEntry(data,cb_back) end
+		},
+		{
+			text = managers.localization:text("sbl_dialog_button_unban_user"),
+			callback = function()
+				QuickMenu:new(managers.localization:text("dialog_sure_to_unban_title"),managers.localization:text("dialog_sure_to_unban_body",{USER=name}),{
+					{
+						text = managers.localization:text("dialog_yes"),
+						callback = function() 
+							managers.ban_list:unban(identifier)
+							
+							show_unbanned_dialog(name,true) -- can't detect success actually
+						end
+					},
+					{
+						text = managers.localization:text("dialog_no"),
+						is_focused_button = true,
+						is_cancel_button = true,
+						callback = cb_back
+					}
+				},true)
+			end
+		},
+		cancel_button
+	}
+	
+	local desc = managers.localization:text("sbl_dialog_banlist_entry_desc",{
+		NAME = name,
+		ID = identifier,
+		DATE = data.timestamp and os.date("%x",data.timestamp) or  managers.localization:text("sbl_dialog_banlist_entry_no_data")
+	})
+	QuickMenu:new(managers.localization:text("sbl_dialog_banlist_entry_title"),desc,options,true)
+end
+
+
+function SearchableBanList:LoadSettings()
+	local file = io.open(self.settings_path, "r")
+	if file then
+		for k, v in pairs(json.decode(file:read("*all"))) do
+			self.search_options[k] = v
+		end
+	end
+end
+
+function SearchableBanList:SaveSettings()
+	local file = io.open(self.settings_path,"w+")
+	if file then
+		file:write(json.encode(self.search_options))
+		file:close()
+	end
+end
+
+
+--[[
+
+
+
+search ->
+aggregate results ->
+paginate x results ->
+<- individual profile ->
+unban
+
+
+--]]
+
+
+
+
+function SearchableBanList:ShowSearchResults(results,search_string) -- deprecated; not interactive
+	local options = {
+		{
+			text = managers.localization:text("menu_ok"),
+			is_focused_button = true,
+			is_cancel_button = true,
+			callback = nil
+		}
 	}
 	
 	local show_id64s = self.search_options.show_id64s
@@ -118,9 +421,7 @@ function SearchableBanList:ShowSearchResults(results,search_string)
 		self:OutputResultsToLog("<Searchable Ban List: Search results for \"" .. tostring(search_string) .. "\">")
 	end
 	if not results or #results < 1 then 
-		QuickMenu:new(managers.localization:text("sbl_prompt_search_failure_title"),managers.localization:text("sbl_prompt_search_failure_desc"),{
-			ok_button
-		},true)
+		QuickMenu:new(managers.localization:text("sbl_prompt_search_failure_title"),managers.localization:text("sbl_prompt_search_failure_desc"),options,true)
 		
 		self:OutputResultsToLog(managers.localization:text("sbl_prompt_search_failure_desc"))
 		self:OutputResultsToLog("<Search results ended>")
@@ -147,67 +448,10 @@ function SearchableBanList:ShowSearchResults(results,search_string)
 	end
 	local banlist_string = table.concat(banlist,"\n")
 	
-	QuickMenu:new(string.gsub(managers.localization:text("sbl_prompt_search_success_title"),"$SEARCHSTRING",search_string),banlist_string,{
-		ok_button
-	},true)
+	QuickMenu:new(string.gsub(managers.localization:text("sbl_prompt_search_success_title"),"$SEARCHSTRING",search_string),banlist_string,options,true)
 end
 
-function SearchableBanList:OnSearchEntryCallback(search_string)
-	local results = self:DoSearchInList(search_string)
-	self:ShowSearchResults(results,search_string)
-end
 
-Hooks:Add("LocalizationManagerPostInit", "LocalizationManagerPostInit_SBL", function( loc )
-	if not BeardLib then 
-		--local loc = managers.localization --debug reasons
-		loc:load_localization_file( SearchableBanList.default_localization_path )
-	end
-end)
-
-Hooks:Add( "MenuManagerInitialize", "MenuManagerInitialize_SBL", function(menu_manager)
-	MenuCallbackHandler.callback_sbl_is_case_sensitive = function(self,item)
-		SearchableBanList.search_options.case_sensitive = item:value() == "on"
-	end
-	MenuCallbackHandler.callback_sbl_require_match_all = function(self,item)
-		SearchableBanList.search_options.require_match_all = item:value() == "on"
-	end
-	MenuCallbackHandler.callback_sbl_substitute_lookalike_characters = function(self,item)
-		SearchableBanList.search_options.substitute_lookalike_characters = item:value() == "on"
-	end
-	MenuCallbackHandler.callback_sbl_search_id64s = function(self,item)
-		SearchableBanList.search_options.search_id64s = item:value() == "on"
-	end
-	MenuCallbackHandler.callback_sbl_show_id64s = function(self,item)
-		SearchableBanList.search_options.show_id64s = item:value() == "on"
-	end
-
-	MenuCallbackHandler.callback_sbl_log_results = function(self,item)
-		SearchableBanList.search_options.log_results = item:value() == "on"
-	end
-
-	MenuCallbackHandler.callback_sbl_show_all_bans = function(self)
-		if not managers.ban_list then 
-			return
-		end
-		
-		local results = {}
-		for i=1,#managers.ban_list._global.banned do 
-			results[i] = i
-		end
-		SearchableBanList:ShowSearchResults(results,"")
-	end
-
-	MenuCallbackHandler.callback_sbl_init_search = function(self)
-		if not _G.QuickKeyboardInput then 
-			SearchableBanList:ShowMissingQKIPrompt()
-			return
-		end
-		_G.QuickKeyboardInput:new(managers.localization:text("sbl_prompt_search_start_title"),managers.localization:text("sbl_prompt_search_start_desc"),"",callback(SearchableBanList,SearchableBanList,"OnSearchEntryCallback"),nil,true)
-	end
-	
-	MenuHelper:LoadFromJsonFile(SearchableBanList.menu_path, SearchableBanList, SearchableBanList.search_options)
-	
-end)
 
 
 -------------
