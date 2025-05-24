@@ -1,0 +1,6 @@
+<mod name="Searchable Ban List" author="Offyerrocker" color="Color(0.9,0.3,0.3)" >
+	<AssetUpdates id="33607" version="1" provider="modworkshop" install_directory = "mods/" version_is_number="false"/>
+	<Localization directory="localization" default="english.json">
+		<loc file="english.json" language="english" />
+	</Localization>
+</mod>

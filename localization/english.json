@@ -1,0 +1,28 @@
+{
+	"sbl_options_title" : "Search Banlist..."
+	"sbl_is_case_sensitive_title" : "Case-Sensitive",
+	"sbl_is_case_sensitive_desc" : "If true, the search will distinguish between uppercase and lowercase letters.",
+	"sbl_require_match_all_title" : "Must Match All Keywords",
+	"sbl_require_match_all_desc" : "If true, only names that match all search keywords (separated by spaces) will be returned.",
+	"sbl_substitute_lookalike_characters_title" : "Substitute Look-Alike Characters",
+	"sbl_substitute_lookalike_characters_desc" : "If true, attempts to decipher names which use accented or letter-like characters.",
+	"sbl_search_id64s_title" : "Search in ID64",
+	"sbl_search_id64s_desc" : "If true, searches the ID64 (eg. 76561197960435530) in the banlist as well as the name.",
+	"sbl_init_search_title" : "Search your banlist...",
+	"sbl_init_search_desc" : "Click to search for a user in your banlist.",
+	"sbl_show_id64s_title" : "Show ID64",
+	"sbl_show_id64s_desc" : "If true, displays the ID64 of each user in the search results.",
+	"sbl_log_results_title" : "Log results",
+	"sbl_log_results_desc" : "If true, logs the search results to the BLT log/console in your \"mods/logs/\" folder.",
+	"sbl_show_all_bans_title" : "Show All Bans",
+	"sbl_show_all_bans_desc" : "Click to show all banned users.",
+	"sbl_prompt_search_start_title" : "Banlist User Search",
+	"sbl_prompt_search_start_desc" : "Search for a user in your banlist",
+	"sbl_prompt_search_success_title" : "Search Complete: \"$SEARCHSTRING\"",
+	"TRANSLATORS_IGNORE_THIS_LINE_sbl_prompt_search_success_desc" : "hey how are you seeing this i didn't actually use this line anywhere. also if you're translating this don't bother with this line",
+	"sbl_prompt_search_failure_title" : "No results",
+	"sbl_prompt_search_failure_desc" : "No banned users found with given search parameters",
+	"sbl_prompt_show_all_title" : "Ban List",
+	"sbl_prompt_missing_qki_title" : "Missing Dependency Mod",
+	"sbl_prompt_missing_qki_desc" : "You must have TdlQ's mod, \"Quick Keyboard Input\" ( https://pd2mods.z77.fr/quick_keyboard_input.html ) in order to use the search function of this mod!"
+}

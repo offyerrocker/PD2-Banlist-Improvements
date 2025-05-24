@@ -1,0 +1,18 @@
+{
+	"name" : "Searchable Ban List",
+	"description" : "Adds a menu to the Mod Options that will let you search for players by name or ID64.\nRequires Quick Keyboard Input.",
+	"author" : "Offyerrocker",
+	"contact" : "Discord: Offyerrocker#3878",
+	"version" : "1",
+	"blt_version" : 2,
+	"color" : "255 128 0",
+	"simple_dependencies" : {
+		"QuickKeyboardInput": "http://pd2mods.z77.fr/update/QuickKeyboardInput.zip"
+	},
+	"hooks" : [
+		{
+			"hook_id" : "lib/managers/menumanager",
+			"script_path" : "hooks/menumanager.lua"
+		}
+	]
+}

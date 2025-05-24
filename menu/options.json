@@ -1,0 +1,86 @@
+{
+	"menu_id" : "sbl_options",
+	"parent_menu_id" : "adv_options",
+	"title" : "sbl_options_title",
+	"after" : "ban_list",
+	"items" : [
+		{
+			"type" : "toggle",
+			"id" : "sbl_is_case_sensitive",
+			"title" : "sbl_is_case_sensitive_title",
+			"description" : "sbl_is_case_sensitive_desc",
+			"callback" : "callback_sbl_is_case_sensitive",
+			"value" : "case_sensitive"
+		},
+		{
+			"type" : "toggle",
+			"id" : "sbl_require_match_all",
+			"title" : "sbl_require_match_all_title",
+			"description" : "sbl_require_match_all_desc",
+			"callback" : "callback_sbl_require_match_all",
+			"value" : "require_match_all"
+		},
+		{
+			"type" : "toggle",
+			"id" : "sbl_substitute_lookalike_characters",
+			"title" : "sbl_substitute_lookalike_characters_title",
+			"description" : "sbl_substitute_lookalike_characters_desc",
+			"callback" : "callback_sbl_substitute_lookalike_characters",
+			"value" : "substitute_lookalike_characters"
+		},
+		{
+			"type" : "toggle",
+			"id" : "sbl_search_id64s",
+			"title" : "sbl_search_id64s_title",
+			"description" : "sbl_search_id64s_desc",
+			"callback" : "callback_sbl_search_id64s",
+			"value" : "search_id64s"
+		},
+		{
+			"type" : "toggle",
+			"id" : "sbl_show_id64s",
+			"title" : "sbl_show_id64s_title",
+			"description" : "sbl_show_id64s_desc",
+			"callback" : "callback_sbl_show_id64s",
+			"value" : "show_id64s"
+		},
+		{
+			"type" : "toggle",
+			"id" : "sbl_log_results",
+			"title" : "sbl_log_results_title",
+			"description" : "sbl_log_results_desc",
+			"callback" : "callback_sbl_log_results",
+			"value" : "log_results"
+		},
+		{
+			"DISABLED_type" : "toggle",
+			"id" : "sbl_search_steam_profiles",
+			"title" : "sbl_search_steam_profiles_title",
+			"description" : "sbl_search_steam_profiles_desc",
+			"callback" : "callback_sbl_search_steam_profiles",
+			"value" : "search_steam_profiles"
+		},
+		{
+			"type" : "divider",
+			"size" : 16
+		},
+		{
+			"type" : "button",
+			"id" : "sbl_init_search",
+			"title" : "sbl_init_search_title",
+			"description" : "sbl_init_search_desc",
+			"callback" : "callback_sbl_init_search"
+		},
+		{
+			"type" : "divider",
+			"size" : 4
+		},
+		{
+			"type" : "button",
+			"id" : "sbl_show_all_bans",
+			"title" : "sbl_show_all_bans_title",
+			"description" : "sbl_show_all_bans_desc",
+			"callback" : "callback_sbl_show_all_bans"
+		}
+	]
+}
