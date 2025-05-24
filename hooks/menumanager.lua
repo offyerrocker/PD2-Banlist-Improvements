@@ -1,11 +1,13 @@
 _G.SearchableBanList = SearchableBanList or {}
 SearchableBanList.mod_path = ModPath
 SearchableBanList.settings_path = SavePath .. "searchable_ban_list_settings.json"
+SearchableBanList.recents_path = SavePath .. "searchable_ban_list_recentplayers.json"
 SearchableBanList.menu_path = SearchableBanList.mod_path .. "menu/options.json"
 SearchableBanList.default_localization_path = SearchableBanList.mod_path .. "localization/english.json"
-SearchableBanList.FBI_PROFILES_URL = tweak_data.gui.fbi_files_webpage .. "/suspect/$id64"
+SearchableBanList.FBI_PROFILES_URL = tweak_data.gui.fbi_files_webpage .. "suspect/$id64"
 SearchableBanList.STEAM_PROFILES_URL = "https://steamcommunity.com/profiles/$id64"
 SearchableBanList.MAX_ENTRIES_PER_PAGE = 10
+SearchableBanList.MAX_RECENT_PLAYERS_CACHE = 50
 SearchableBanList.default_options = { --these options are saved between sessions
 	case_sensitive = false,
 	search_id64s = false,
@@ -18,10 +20,22 @@ SearchableBanList.default_options = { --these options are saved between sessions
 }
 SearchableBanList.search_options = table.deep_map_copy(SearchableBanList.default_options)
 
+
 SearchableBanList._lookalike_characters = {
 	["%$"] = "S", -- the dollar sign character "$" has special meaning in patterns
 	["%^"] = "%%%^", --same with caret character "^"
 	["%."] = "%%%." --same with period character "."
+}
+
+SearchableBanList._recent_players = {
+				--[[
+	{
+		name
+		id = string
+		platform = string "EPIC" || string "STEAM"
+		account_id = string?
+	}
+				--]]
 }
 
 function SearchableBanList:OutputResultsToLog(...)
@@ -57,66 +71,60 @@ function SearchableBanList:SubstituteSimilarCharacters(str)
 	return str
 end
 
-function SearchableBanList:DoSearchInList(raw_search_text)
-	if managers.ban_list then 
-		local search_text = raw_search_text
-		local case_sensitive = self.search_options.case_sensitive
-		local require_match_all = self.search_options.require_match_all
-		local substitute_lookalike_characters = self.search_options.substitute_lookalike_characters
-		local search_id64s = self.search_options.search_id64s
+function SearchableBanList:DoSearchInList(raw_search_text,user_list)
+	local search_text = raw_search_text
+	local case_sensitive = self.search_options.case_sensitive
+	local require_match_all = self.search_options.require_match_all
+	local substitute_lookalike_characters = self.search_options.substitute_lookalike_characters
+	local search_id64s = self.search_options.search_id64s
+	if substitute_lookalike_characters then 
+		search_text = self:SubstituteSimilarCharacters(search_text)
+	end
+	if not case_sensitive then 
+		search_text = utf8.to_lower(search_text)
+	end
+	search_text = string.gsub(search_text,"%%","%%%%")
+	search_text = string.gsub(search_text,"\n","")
+	local search_keywords = string.split(search_text," ")
+	
+	local search_results = {}
+	
+	for i,banned_user in ipairs(user_list) do 
+		--do ordered search to preserve sorting by time
+		local id64 = banned_user.identifier
+		local raw_username = banned_user.name
+		local username = raw_username
 		if substitute_lookalike_characters then 
-			search_text = self:SubstituteSimilarCharacters(search_text)
+			username = self:SubstituteSimilarCharacters(username)
 		end
+		
 		if not case_sensitive then 
-			search_text = utf8.to_lower(search_text)
+			username = utf8.to_lower(username)
 		end
-		search_text = string.gsub(search_text,"%%","%%%%")
-		search_text = string.gsub(search_text,"\n","")
-		local search_keywords = string.split(search_text," ")
-		
-		local search_results = {}
-		
-		for i,banned_user in ipairs(managers.ban_list._global.banned) do 
-			--do ordered search to preserve sorting by time
-			local id64 = banned_user.identifier
-			local raw_username = banned_user.name
-			local username = raw_username
-			if substitute_lookalike_characters then 
-				username = self:SubstituteSimilarCharacters(username)
-			end
-			
-			if not case_sensitive then 
-				username = utf8.to_lower(username)
-			end
-			local is_match = false
-			local matched_all = true
-			for _,_search_text in pairs(search_keywords) do
-				if string.find(username,_search_text) or (search_id64s and string.find(id64,_search_text)) then 
-					if not require_match_all then 
-						is_match = true
-						break
-					end
-				elseif require_match_all then 
-					matched_all = false
+		local is_match = false
+		local matched_all = true
+		for _,_search_text in pairs(search_keywords) do
+			if string.find(username,_search_text) or (search_id64s and string.find(id64,_search_text)) then 
+				if not require_match_all then 
+					is_match = true
 					break
 				end
+			elseif require_match_all then 
+				matched_all = false
+				break
 			end
-			if require_match_all and matched_all then 
-				is_match = true
-			end
-			
-			if is_match then 
-				table.insert(search_results,#search_results + 1,banned_user)
-			end
-			
+		end
+		if require_match_all and matched_all then 
+			is_match = true
 		end
 		
-		return search_results
-	else
-		self:OutputResultsToLog("ERROR: SearchableBanList: managers.ban_list is not initialized")
-		return
+		if is_match then 
+			table.insert(search_results,#search_results + 1,banned_user)
+		end
+		
 	end
 	
+	return search_results
 end
 
 function SearchableBanList:ShowMissingQKIPrompt()
@@ -130,8 +138,8 @@ function SearchableBanList:ShowMissingQKIPrompt()
 	},true)
 end
 
-function SearchableBanList:OnSearchEntryCallback(search_string)
-	local results = self:DoSearchInList(search_string)
+function SearchableBanList:OnSearchEntryCallback(search_string,user_list,populate_options_clbk)
+	local results = self:DoSearchInList(search_string,user_list)
 	if #results > 0 then
 	
 		self:OutputResultsToLog("============")
@@ -144,8 +152,9 @@ function SearchableBanList:OnSearchEntryCallback(search_string)
 			self:OutputResultsToLog(s)
 		end
 		self:OutputResultsToLog("============")
-		
-		self:ShowEntries(results,1)
+		--sbl_dialog_banlist_title
+		--sbl_dialog_banlist_desc
+		self:ShowEntries(results,1,"sbl_dialog_banlist_title","sbl_dialog_banlist_desc",populate_options_clbk)
 	else
 		self:OutputResultsToLog("No results found for:" .. tostring(search_string))
 		QuickMenu:new("No results","No bans found by search string: " .. tostring(search_string),{
@@ -208,7 +217,7 @@ Hooks:Add( "MenuManagerInitialize", "MenuManagerInitialize_SBL", function(menu_m
 			return
 		end
 		
-		local results = table.deep_map_copy(managers.ban_list._global.banned)
+		local results = managers.ban_list._global.banned --table.deep_map_copy(managers.ban_list._global.banned)
 		--[[
 		local results = {}
 		for i=1,51 do 
@@ -222,23 +231,111 @@ Hooks:Add( "MenuManagerInitialize", "MenuManagerInitialize_SBL", function(menu_m
 			}
 		end
 		--]]
-		SearchableBanList:ShowEntries(results,1)
-	end
-
-	MenuCallbackHandler.callback_sbl_init_search = function(self)
-		if not _G.QuickKeyboardInput then 
-			SearchableBanList:ShowMissingQKIPrompt()
-			return
-		end
-		_G.QuickKeyboardInput:new(managers.localization:text("sbl_prompt_search_start_title"),managers.localization:text("sbl_prompt_search_start_desc"),"",callback(SearchableBanList,SearchableBanList,"OnSearchEntryCallback"),nil,true)
+		SearchableBanList:ShowEntries(results,1,"sbl_dialog_banlist_title","sbl_dialog_banlist_desc",callback(SearchableBanList,SearchableBanList,"PopulateBannedListOptions"))
 	end
 	
+	MenuCallbackHandler.callback_sbl_show_all_recents = function(self)
+		local recent_players = SearchableBanList:GetRecentPlayers()
+		SearchableBanList:ShowEntries(recent_players,1,"sbl_dialog_recentlist_title","sbl_dialog_recentlist_desc",callback(SearchableBanList,SearchableBanList,"PopulateRecentListOptions"))
+	end
+	
+	MenuCallbackHandler.callback_sbl_paste_ban = function(self)
+		if not managers.ban_list then 
+			log("[Searchable Ban List] Error 3: No ban list manager")
+			return
+		end
+		
+		
+		-- TODO put this inside a confirm prompt first
+		
+		local clipboard = Application:get_clipboard()
+		local identifier = string.gsub(clipboard,"%W","") --remove non-alphanumeric characters
+		local name=clipboard
+		local account_id = identifier
+		local platform
+		local timestamp
+		
+		if clipboard then
+			-- ban them here to trigger the banlistmanager hook (for mod compatibility),
+			-- then go and edit the entry
+			local success,err_code = SearchableBanList:BanPlayerById(clipboard,name)
+		
+			if not success then
+				local err_title = managers.localization:text("sbl_dialog_failure",{code=err_code})
+				local err_msg = ""
+				if err_code == 1 then
+					err_msg = managers.localization:text("sbl_dialog_player_already_banned",{id=clipboard})
+				end
+				QuickMenu:new(err_title,err_msg,nil,true)
+				log(string.format("[Searchable Ban List] %s: %s",err_title,err_msg))
+				return
+			end
+			
+			-- check if the given player is in the ban list already
+			for _,v in pairs(SearchableBanList._recent_players) do 
+				if v.identifier == identifier or v.account_id == identifier then
+					name = v.name or "[no name]"
+					account_id = v.account_id or account_id
+					platform = v.platform
+					break
+				end
+			end
+			
+			if not (platform or name) then
+				local _name = Steam:username(account_id) 
+				if _name then
+					name = _name
+					platform = "STEAM"
+				end
+			end
+			
+			for k,data in pairs(managers.ban_list._global.banned) do 
+				if data.identifier == identifier then
+					data.account_id = account_id
+					data.platform = platform
+					
+					-- get timestamp for success dialog
+					timestamp = data.timestamp
+					break
+				end
+			end
+			
+			QuickMenu:new(managers.localization:text("sbl_manual_ban_success_title"),managers.localization:text("sbl_manual_ban_success_desc",
+					{
+						PLAYER_STRING = SearchableBanList:MakePlayerEntryString({
+							NAME = name,
+							USER = name,
+							ID = identifier,
+							ACCOUNT_ID = account_id or managers.localization:text("sbl_dialog_banlist_entry_no_data"),
+							PLATFORM = platform or managers.localization:text("sbl_dialog_banlist_entry_no_data"),
+							DATE = timestamp and os.date("%x",timestamp) or managers.localization:text("sbl_dialog_banlist_entry_no_data")
+						})
+					}
+				),
+				{
+					text = managers.localization:text("dialog_ok"),
+					is_cancel_button = true
+				},
+				true
+			)
+		else
+			QuickMenu:new(managers.localization:text("sbl_dialog_invalid_ban_clipboard_title"),managers.localization:text("sbl_dialog_invalid_ban_clipboard_desc"),{
+				{
+					text = managers.localization:text("dialog_ok"),
+					is_cancel_button = true
+				}
+			},true)
+		end
+		
+		
+		
+		
+	end
 	MenuCallbackHandler.callback_sbl_manual_add_ban = function(self)
 		if not managers.ban_list then 
 			log("[Searchable Ban List] Error 2: No ban list manager")
 			return
 		end
-		
 		
 		if not _G.QuickKeyboardInput then 
 			SearchableBanList:ShowMissingQKIPrompt()
@@ -267,7 +364,20 @@ Hooks:Add( "MenuManagerInitialize", "MenuManagerInitialize_SBL", function(menu_m
 			
 			local success,err_code = SearchableBanList:BanPlayerById(id,name)
 			if success then
-				QuickMenu:new(managers.localization:text("sbl_manual_ban_success_title"),managers.localization:text("sbl_manual_ban_success_desc",{id=id,name=name}),nil,true)
+				QuickMenu:new(managers.localization:text("sbl_manual_ban_success_title"),managers.localization:text("sbl_manual_ban_success_desc",
+						{
+							PLAYER_STRING = SearchableBanList:MakePlayerEntryString({
+								id=id,
+								name=name
+							})
+						}
+					),
+					{
+						text = managers.localization:text("dialog_ok"),
+						is_cancel_button = true
+					},
+					true
+				)
 			else
 				local err_title = managers.localization:text("sbl_dialog_failure",{code=err_code})
 				local err_msg = ""
@@ -278,8 +388,6 @@ Hooks:Add( "MenuManagerInitialize", "MenuManagerInitialize_SBL", function(menu_m
 				log(string.format("[Searchable Ban List] %s: %s",err_title,err_msg))
 				return
 			end
-			
-			
 		end
 		
 		
@@ -287,13 +395,77 @@ Hooks:Add( "MenuManagerInitialize", "MenuManagerInitialize_SBL", function(menu_m
 		_G.QuickKeyboardInput:new(managers.localization:text("sbl_dialog_add_manual_ban_title"),managers.localization:text("sbl_dialog_add_manual_ban_desc"),"",clbk_identifier_entered,nil,true)
 	end
 	
+	MenuCallbackHandler.callback_sbl_init_search_banlist = function(self)
+		if not _G.QuickKeyboardInput then 
+			SearchableBanList:ShowMissingQKIPrompt()
+			return
+		end
+		if not managers.ban_list then
+			-- sbl_dialog_failure
+			return
+		end
+		_G.QuickKeyboardInput:new(managers.localization:text("sbl_prompt_search_banlist_title"),managers.localization:text("sbl_prompt_search_banlist_desc"),"",function(search_string) SearchableBanList:OnSearchEntryCallback(search_string,managers.ban_list._global.banned,callback(SearchableBanList,SearchableBanList,"PopulateBannedListOptions")) end,nil,true)
+	end
+	
+	MenuCallbackHandler.callback_sbl_init_search_recentlist = function(self)
+		if not _G.QuickKeyboardInput then 
+			SearchableBanList:ShowMissingQKIPrompt()
+			return
+		end
+		
+		_G.QuickKeyboardInput:new(managers.localization:text("sbl_prompt_search_recentlist_title"),managers.localization:text("sbl_prompt_search_recentlist_desc"),"",function(search_string) SearchableBanList:OnSearchEntryCallback(search_string,SearchableBanList:GetRecentPlayers(),callback(SearchableBanList,SearchableBanList,"PopulateRecentListOptions")) end,nil,true)
+	end
+	
 	
 	SearchableBanList:LoadSettings()
+	SearchableBanList:LoadRecentPlayers()
 	MenuHelper:LoadFromJsonFile(SearchableBanList.menu_path, SearchableBanList, SearchableBanList.search_options)
 	
 end)
 
-function SearchableBanList:ShowEntries(page_data,page_num)
+function SearchableBanList:PopulateBannedListOptions(options,player_data,back_clbk)
+	local button_title
+	
+	if self.search_options.show_id64s then
+		button_title = string.format("%s : %s",player_data.name,player_data.account_id or player_data.identifier)
+	else
+		button_title = player_data.name
+	end
+	
+	table.insert(options,#options+1,{
+		text = button_title,
+		callback = function()
+			self:ShowBannedEntry(player_data,back_clbk)
+		end
+	})
+	
+	return options
+end
+
+function SearchableBanList:PopulateRecentListOptions(options,player_data,back_clbk)
+	local button_title
+	
+	if self.search_options.show_id64s then
+		button_title = string.format("%s : %s",player_data.name,player_data.account_id or player_data.identifier)
+	else
+		button_title = player_data.name
+	end
+	
+	table.insert(options,#options+1,{
+		text = button_title,
+		callback = function()
+			self:ShowRecentEntry(player_data,back_clbk)
+		end
+	})
+	
+	return options
+end
+
+function SearchableBanList:ShowEntries(page_data,page_num,dialog_title,dialog_desc,populate_player_options_clbk)
+	local back_clbk = function()
+		self:ShowEntries(page_data,page_num,dialog_title,dialog_desc,populate_player_options_clbk)
+	end
+	
 	page_num = page_num or 1
 	local total_num_entries = #page_data
 	local total_num_pages = math.ceil(total_num_entries / self.MAX_ENTRIES_PER_PAGE)
@@ -302,10 +474,6 @@ function SearchableBanList:ShowEntries(page_data,page_num)
 	local page_start = self.MAX_ENTRIES_PER_PAGE * (page_num - 1)
 	local page_finish = page_start + math.min(total_num_entries - page_start,self.MAX_ENTRIES_PER_PAGE)
 	
-	if total_num_entries == 0 then
-		-- assume this check is handled elsewhere
-		--return
-	end
 	local options = {}
 	local cancel_button = { -- "ok"/"cancel"/"back" button (end transaction)
 		text = managers.localization:text("sbl_dialog_ok"),
@@ -314,25 +482,10 @@ function SearchableBanList:ShowEntries(page_data,page_num)
 		callback = nil
 	}
 	
-	local function insert_user_callback(banned_data)
-		local button_title
-		
-		if self.search_options.show_id64s then
-			button_title = string.format("%s : %s",banned_data.name,banned_data.identifier)
-		else
-			button_title = banned_data.name
-		end
-		
-		table.insert(options,#options+1,{
-			text = button_title,
-			callback = function() self:ShowBannedEntry(banned_data,function() self:ShowEntries(page_data,page_num) end) end
-		})
-	end
-	
 	for i=page_start,page_finish-1,1 do 
 		local banned_data = page_data[i + 1]
 		if banned_data then
-			insert_user_callback(banned_data)
+			populate_player_options_clbk(options,banned_data,back_clbk)
 		else
 			-- no more banned users to add
 			break
@@ -343,26 +496,27 @@ function SearchableBanList:ShowEntries(page_data,page_num)
 		-- "page back" button
 		table.insert(options,#options+1,{
 			text = managers.localization:text("sbl_dialog_pageprev"),
-			callback = function() self:ShowEntries(page_data,page_num - 1) end
+			callback = function() self:ShowEntries(page_data,page_num - 1,dialog_title,dialog_desc,populate_player_options_clbk) end
 		})
 	end
 	if page_num < total_num_pages then
 		-- "page fwd" button
 		table.insert(options,#options+1,{
 			text = managers.localization:text("sbl_dialog_pagenext"),
-			callback = function() self:ShowEntries(page_data,page_num + 1) end
+			callback = function() self:ShowEntries(page_data,page_num + 1,dialog_title,dialog_desc,populate_player_options_clbk) end
 		})
 	end
 	
 	-- insert cancel button
 	table.insert(options,#options+1,cancel_button)
 	
-	QuickMenu:new(managers.localization:text("sbl_dialog_banlist_title",{CURRENT=page_num,TOTAL=total_num_pages}),managers.localization:text("sbl_dialog_banlist_desc",{MIN=page_start + 1,MAX=page_finish,TOTAL=total_num_entries}),options,true)
+	QuickMenu:new(managers.localization:text(dialog_title,{CURRENT=page_num,TOTAL=total_num_pages}),managers.localization:text(dialog_desc,{MIN=page_start + 1,MAX=page_finish,TOTAL=total_num_entries}),options,true)
 end
 
-function SearchableBanList:ShowBannedEntry(data,cb_back)
-	local name = data.name
-	local identifier = data.identifier
+function SearchableBanList:ShowBannedEntry(player_data,cb_back)
+	local name = player_data.name
+	local identifier = player_data.identifier
+	local account_id = player_data.account_id
 	
 	local cancel_button = { -- "ok"/"cancel"/"back" button (end transaction)
 		text = managers.localization:text("sbl_dialog_ok"),
@@ -371,13 +525,13 @@ function SearchableBanList:ShowBannedEntry(data,cb_back)
 		callback = cb_back
 	}
 	
-	local function show_unbanned_dialog(name,success)
+	local function show_success_dialog(name,success)
 		if success then 
-			QuickMenu:new(managers.localization:text("sbl_dialog_success"),managers.localization:text("sbl_dialog_unban_success_desc",{NAME=name}),{
+			QuickMenu:new(managers.localization:text("sbl_dialog_success"),managers.localization:text("sbl_dialog_unban_success_desc",self:GetPlayerEntryMacro(player_data)),{
 				cancel_button
 			},true)
 		else
-			QuickMenu:new(managers.localization:text("sbl_dialog_failure"),managers.localization:text("sbl_dialog_unban_failure_desc",{NAME=name}),{
+			QuickMenu:new(managers.localization:text("sbl_dialog_failure"),managers.localization:text("sbl_dialog_unban_failure_desc",self:GetPlayerEntryMacro(player_data)),{
 				cancel_button
 			},true)
 		end
@@ -386,22 +540,22 @@ function SearchableBanList:ShowBannedEntry(data,cb_back)
 	local options = {
 		{
 			text = managers.localization:text("sbl_dialog_button_open_profile_steam"),
-			callback = function() self:OpenURL(string.gsub(self.STEAM_PROFILES_URL,"$id64",identifier)); self:ShowBannedEntry(data,cb_back) end
+			callback = function() self:OpenURL(string.gsub(self.STEAM_PROFILES_URL,"$id64",account_id)); self:ShowBannedEntry(player_data,cb_back) end
 		},
 		{
 			text = managers.localization:text("sbl_dialog_button_open_profile_fbi"),
-			callback = function() self:OpenURL(string.gsub(self.FBI_PROFILES_URL,"$id64",identifier)); self:ShowBannedEntry(data,cb_back) end
+			callback = function() self:OpenURL(string.gsub(self.FBI_PROFILES_URL,"$id64",account_id)); self:ShowBannedEntry(player_data,cb_back) end
 		},
 		{
 			text = managers.localization:text("sbl_dialog_button_unban_user"),
 			callback = function()
-				QuickMenu:new(managers.localization:text("dialog_sure_to_unban_title"),managers.localization:text("dialog_sure_to_unban_body",{USER=name}),{
+				QuickMenu:new(managers.localization:text("dialog_sure_to_unban_title"),managers.localization:text("dialog_sure_to_unban_body",self:GetPlayerEntryMacro(player_data)),{ -- use vanilla ban localization
 					{
 						text = managers.localization:text("dialog_yes"),
 						callback = function() 
 							managers.ban_list:unban(identifier)
 							
-							show_unbanned_dialog(name,true) -- can't detect success actually
+							show_success_dialog(name,true) -- can't technically detect success actually
 						end
 					},
 					{
@@ -416,14 +570,133 @@ function SearchableBanList:ShowBannedEntry(data,cb_back)
 		cancel_button
 	}
 	
-	local desc = managers.localization:text("sbl_dialog_banlist_entry_desc",{
-		NAME = name,
-		ID = identifier,
-		DATE = data.timestamp and os.date("%x",data.timestamp) or  managers.localization:text("sbl_dialog_banlist_entry_no_data")
-	})
+	local desc = self:MakePlayerEntryString(player_data)
 	QuickMenu:new(managers.localization:text("sbl_dialog_banlist_entry_title"),desc,options,true)
 end
 
+function SearchableBanList:MakePlayerEntryString(player_data)
+	return managers.localization:text("sbl_dialog_banlist_entry_desc",self:GetPlayerEntryMacro(player_data))
+end
+
+function SearchableBanList:GetPlayerEntryMacro(player_data)
+	return {
+		NAME = player_data.name,
+		USER = player_data.name, -- for vanilla dialog localization
+		ID = player_data.identifier,
+		ACCOUNT_ID = player_data.account_id or managers.localization:text("sbl_dialog_banlist_entry_no_data"),
+		PLATFORM = player_data.platform or managers.localization:text("sbl_dialog_banlist_entry_no_data"), -- don't bother localizing platform name, just use internal id
+		DATE = player_data.timestamp and os.date("%x",player_data.timestamp) or managers.localization:text("sbl_dialog_banlist_entry_no_data")
+	}
+end
+
+function SearchableBanList:ShowRecentEntry(player_data,cb_back)
+	local name = player_data.name
+	local account_id = player_data.account_id
+	local identifier = player_data.identifier
+	
+	local cancel_button = { -- "ok"/"cancel"/"back" button (end transaction)
+		text = managers.localization:text("sbl_dialog_ok"),
+		is_focused_button = true,
+		is_cancel_button = true,
+		callback = cb_back
+	}
+	
+	local options = {}
+	if player_data.platform == "STEAM" then
+		table.insert(options,#options+1,{
+			text = managers.localization:text("sbl_dialog_button_open_profile_steam"),
+			callback = function() self:OpenURL(string.gsub(self.STEAM_PROFILES_URL,"$id64",account_id)); self:ShowRecentEntry(player_data,cb_back) end
+		})
+		table.insert(options,#options+1,{
+			text = managers.localization:text("sbl_dialog_button_open_profile_fbi"),
+			callback = function() self:OpenURL(string.gsub(self.FBI_PROFILES_URL,"$id64",account_id)); self:ShowRecentEntry(player_data,cb_back) end
+		})
+	end
+	if managers.ban_list:banned(identifier) then
+		local function show_success_dialog(name,success)
+			if success then 
+				QuickMenu:new(managers.localization:text("sbl_dialog_success"),managers.localization:text("sbl_dialog_unban_success_desc",self:GetPlayerEntryMacro(player_data)),{
+					cancel_button
+				},true)
+			else
+				QuickMenu:new(managers.localization:text("sbl_dialog_failure"),managers.localization:text("sbl_dialog_unban_failure_desc",self:GetPlayerEntryMacro(player_data)),{
+					cancel_button
+				},true)
+			end
+		end
+		table.insert(options,#options+1,{
+			text = managers.localization:text("sbl_dialog_button_unban_user"),
+			callback = function()
+				QuickMenu:new(managers.localization:text("dialog_sure_to_unban_title"),managers.localization:text("dialog_sure_to_unban_body",self:GetPlayerEntryMacro(player_data)),{ -- use vanilla ban localization
+					{
+						text = managers.localization:text("dialog_yes"),
+						callback = function() 
+							managers.ban_list:unban(identifier)
+							
+							show_success_dialog(name,true) -- can't technically detect success actually
+						end
+					},
+					{
+						text = managers.localization:text("dialog_no"),
+						is_focused_button = true,
+						is_cancel_button = true,
+						callback = cb_back
+					}
+				},true)
+			end
+		})
+	else
+		table.insert(options,#options+1,
+			{
+				text = managers.localization:text("sbl_dialog_button_ban_user"),
+				callback = function()
+					QuickMenu:new(managers.localization:text("dialog_sure_to_unban_title"),managers.localization:text("dialog_sure_to_unban_body",self:GetPlayerEntryMacro(player_data)),{ -- use vanilla ban localization
+						{
+							text = managers.localization:text("dialog_yes"),
+							callback = function() 
+								local success,err_code = SearchableBanList:BanPlayerById(identifier,name)
+								if success then
+									QuickMenu:new(managers.localization:text("sbl_manual_ban_success_title"),managers.localization:text("sbl_manual_ban_success_desc",
+											{
+												PLAYER_STRING = SearchableBanList:MakePlayerEntryString(player_data)
+											}
+										),
+										{
+											text = managers.localization:text("dialog_ok"),
+											is_cancel_button = true
+										},
+										true
+									)
+								else
+									local err_title = managers.localization:text("sbl_dialog_failure",{code=err_code})
+									local err_msg = ""
+									if err_code == 1 then
+										err_msg = managers.localization:text("sbl_dialog_player_already_banned",{id=tostring(identifier)})
+									end
+									QuickMenu:new(err_title,err_msg,nil,true)
+									log(string.format("[Searchable Ban List] %s: %s",err_title,err_msg))
+									return
+								end
+							end
+						},
+						{
+							text = managers.localization:text("dialog_no"),
+							is_focused_button = true,
+							is_cancel_button = true,
+							callback = cb_back
+						}
+					},true)
+				end
+			}
+		)
+	end
+	table.insert(options,#options+1,cancel_button)
+	
+	local desc = self:MakePlayerEntryString(player_data)
+	QuickMenu:new(managers.localization:text("sbl_dialog_banlist_entry_title"),desc,options,true)
+end
+
+-- manually ban steam id or epic id
 function SearchableBanList:BanPlayerById(identifier,name)
 	local str_id = tostring(identifier)
 	if managers.ban_list:banned(identifier) then
@@ -434,6 +707,43 @@ function SearchableBanList:BanPlayerById(identifier,name)
 	end
 end
 
+function SearchableBanList:RegisterRecentPlayer(data)
+	self:_RegisterRecentPlayer(data)
+	self:SaveRecentPlayers()
+end
+
+function SearchableBanList:_RegisterRecentPlayer(data)
+	if data.identifier then
+		for i=#self._recent_players,1,-1 do 
+			local v = self._recent_players[i]
+			if v.identifier == data.identifier then
+				-- clear any duplicates of the new recent player
+				table.remove(self._recent_players,i)
+			end
+		end
+	end
+	local num_recents = #self._recent_players
+	local MAX = self.MAX_RECENT_PLAYERS_CACHE
+	if num_recents >= MAX then
+		-- check for overflow
+		for i=num_recents-MAX,1,-1 do 
+			-- remove oldest from list
+			table.remove(self._recent_players,i)
+		end
+	end
+	table.insert(self._recent_players,1,data)
+	data.timestamp = os.time()
+end
+
+function SearchableBanList:ClearRecentPlayers() -- functional but not used
+	for k,_ in pairs(self._recent_players) do 
+		self._recent_players[k] = nil
+	end
+end
+
+function SearchableBanList:GetRecentPlayers()
+	return self._recent_players
+end
 
 function SearchableBanList:LoadSettings()
 	local file = io.open(self.settings_path, "r")
@@ -448,6 +758,26 @@ function SearchableBanList:SaveSettings()
 	local file = io.open(self.settings_path,"w+")
 	if file then
 		file:write(json.encode(self.search_options))
+		file:close()
+	end
+end
+
+
+function SearchableBanList:LoadRecentPlayers()
+	local file = io.open(self.recents_path, "r")
+	if file then
+		local data = json.decode(file:read("*all"))
+		if not data then return end
+		for i, v in ipairs(data) do
+			self._recent_players[i] = v
+		end
+	end
+end
+
+function SearchableBanList:SaveRecentPlayers()
+	local file = io.open(self.recents_path,"w+")
+	if file then
+		file:write(json.encode(self._recent_players))
 		file:close()
 	end
 end

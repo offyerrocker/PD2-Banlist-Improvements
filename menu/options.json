@@ -86,14 +86,10 @@
 		},
 		{
 			"type" : "button",
-			"id" : "sbl_init_search",
-			"title" : "sbl_init_search_title",
-			"description" : "sbl_init_search_desc",
-			"callback" : "callback_sbl_init_search"
-		},
-		{
-			"type" : "divider",
-			"size" : 4
+			"id" : "sbl_init_search_banlist",
+			"title" : "sbl_init_search_banlist_title",
+			"description" : "sbl_init_search_banlist_desc",
+			"callback" : "callback_sbl_init_search_banlist"
 		},
 		{
 			"type" : "button",
@@ -108,6 +104,31 @@
 			"title" : "sbl_manual_ban_title",
 			"description" : "sbl_manual_ban_desc",
 			"callback" : "callback_sbl_manual_add_ban"
+		},
+		{
+			"type" : "button",
+			"id" : "sbl_paste_ban",
+			"title" : "sbl_paste_ban_title",
+			"description" : "sbl_paste_ban_desc",
+			"callback" : "callback_sbl_paste_ban"
+		},
+		{
+			"type" : "divider",
+			"size" : 4
+		},
+		{
+			"type" : "button",
+			"id" : "sbl_show_all_recents",
+			"title" : "sbl_show_all_recents_title",
+			"description" : "sbl_show_all_recents_desc",
+			"callback" : "callback_sbl_show_all_recents"
+		},
+		{
+			"type" : "button",
+			"id" : "sbl_init_search_searchlist",
+			"title" : "sbl_init_search_recentlist_title",
+			"description" : "sbl_init_search_recentlist_desc",
+			"callback" : "callback_sbl_init_search_recentlist"
 		}
 	]
 }
