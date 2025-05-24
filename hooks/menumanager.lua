@@ -204,7 +204,7 @@ Hooks:Add( "MenuManagerInitialize", "MenuManagerInitialize_SBL", function(menu_m
 
 	MenuCallbackHandler.callback_sbl_show_all_bans = function(self)
 		if not managers.ban_list then 
-			log("[Searchable Ban List] Error: No ban list manager")
+			log("[Searchable Ban List] Error 1: No ban list manager")
 			return
 		end
 		
@@ -232,6 +232,61 @@ Hooks:Add( "MenuManagerInitialize", "MenuManagerInitialize_SBL", function(menu_m
 		end
 		_G.QuickKeyboardInput:new(managers.localization:text("sbl_prompt_search_start_title"),managers.localization:text("sbl_prompt_search_start_desc"),"",callback(SearchableBanList,SearchableBanList,"OnSearchEntryCallback"),nil,true)
 	end
+	
+	MenuCallbackHandler.callback_sbl_manual_add_ban = function(self)
+		if not managers.ban_list then 
+			log("[Searchable Ban List] Error 2: No ban list manager")
+			return
+		end
+		
+		
+		if not _G.QuickKeyboardInput then 
+			SearchableBanList:ShowMissingQKIPrompt()
+			return
+		end
+		
+		local function clbk_identifier_entered(id)
+			
+			if not id or id == "" then
+				return
+			end
+			
+			local str_id = tostring(id)
+			
+			local name
+			if _G.Steam then
+				name = Steam:username(str_id)
+				-- this fetch will probably only succeed if you have recently played with this player,
+				-- or if the player is already on your friends list;
+				-- otherwise it will return "[unknown]"
+			end
+			
+			if not (name and name ~= "[unknown]") then
+				name = "[" .. str_id .. "]"
+			end 
+			
+			local success,err_code = SearchableBanList:BanPlayerById(id,name)
+			if success then
+				QuickMenu:new(managers.localization:text("sbl_manual_ban_success_title"),managers.localization:text("sbl_manual_ban_success_desc",{id=id,name=name}),nil,true)
+			else
+				local err_title = managers.localization:text("sbl_dialog_failure",{code=err_code})
+				local err_msg = ""
+				if err_code == 1 then
+					err_msg = managers.localization:text("sbl_dialog_player_already_banned",{id=str_id})
+				end
+				QuickMenu:new(err_title,err_msg,nil,true)
+				log(string.format("[Searchable Ban List] %s: %s",err_title,err_msg))
+				return
+			end
+			
+			
+		end
+		
+		
+		
+		_G.QuickKeyboardInput:new(managers.localization:text("sbl_dialog_add_manual_ban_title"),managers.localization:text("sbl_dialog_add_manual_ban_desc"),"",clbk_identifier_entered,nil,true)
+	end
+	
 	
 	SearchableBanList:LoadSettings()
 	MenuHelper:LoadFromJsonFile(SearchableBanList.menu_path, SearchableBanList, SearchableBanList.search_options)
@@ -367,6 +422,16 @@ function SearchableBanList:ShowBannedEntry(data,cb_back)
 		DATE = data.timestamp and os.date("%x",data.timestamp) or  managers.localization:text("sbl_dialog_banlist_entry_no_data")
 	})
 	QuickMenu:new(managers.localization:text("sbl_dialog_banlist_entry_title"),desc,options,true)
+end
+
+function SearchableBanList:BanPlayerById(identifier,name)
+	local str_id = tostring(identifier)
+	if managers.ban_list:banned(identifier) then
+		return false,1
+	else
+		managers.ban_list:ban(identifier,name)
+		return true
+	end
 end
 
 

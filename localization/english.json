@@ -38,7 +38,8 @@
 	"sbl_dialog_urlcopy_success_desc" : "Copied URL to clipboard:\n$URL",
 	"sbl_dialog_banlist_entry_no_data" : "(no data)",
 	"sbl_dialog_success" : "Success",
-	"sbl_dialog_failure" : "Error",
+	"sbl_dialog_failure" : "Error %code",
+	"sbl_dialog_player_already_banned" : "Player $id is already banned!",
 	"sbl_dialog_unban_success_desc" : "Removed $NAME from the ban list.",
 	"sbl_dialog_unban_failure_desc" : "Could not remove $NAME from the ban list. Please refresh and try again.",
 	"sbl_record_additional_ban_data_title" : "Track time of ban",
@@ -46,5 +47,11 @@
 	"sbl_link_behavior_title" : "Links/URLs",
 	"sbl_link_behavior_desc" : "Choose how to open Steam/FBI profile links",
 	"sbl_link_behavior_overlay" : "Open in overlay",
-	"sbl_link_behavior_clipboard" : "Copy to clipboard"
+	"sbl_link_behavior_clipboard" : "Copy to clipboard",
+	"sbl_dialog_add_manual_ban_title" : "Enter Player ID",
+	"sbl_dialog_add_manual_ban_desc" : "Type or paste the Steam ID64 of the player to ban:",
+	"sbl_manual_ban_title" : "Add Player to Banlist",
+	"sbl_manual_ban_desc" : "Click to add a player id to your banlist.",
+	"sbl_manual_ban_success_title" : "Success",
+	"sbl_manual_ban_success_desc" : "Player added to ban list:\n[ID]\n$id\n[NICKNAME]\n$name"
 }

@@ -101,6 +101,13 @@
 			"title" : "sbl_show_all_bans_title",
 			"description" : "sbl_show_all_bans_desc",
 			"callback" : "callback_sbl_show_all_bans"
+		},
+		{
+			"type" : "button",
+			"id" : "sbl_manual_add_ban",
+			"title" : "sbl_manual_ban_title",
+			"description" : "sbl_manual_ban_desc",
+			"callback" : "callback_sbl_manual_add_ban"
 		}
 	]
 }
