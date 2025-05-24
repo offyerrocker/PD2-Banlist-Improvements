@@ -650,7 +650,7 @@ function SearchableBanList:ShowRecentEntry(player_data,cb_back)
 			{
 				text = managers.localization:text("sbl_dialog_button_ban_user"),
 				callback = function()
-					QuickMenu:new(managers.localization:text("dialog_sure_to_unban_title"),managers.localization:text("dialog_sure_to_unban_body",self:GetPlayerEntryMacro(player_data)),{ -- use vanilla ban localization
+					QuickMenu:new(managers.localization:text("dialog_sure_to_ban_title"),managers.localization:text("dialog_sure_to_ban_body",self:GetPlayerEntryMacro(player_data)),{ -- use vanilla ban localization
 						{
 							text = managers.localization:text("dialog_yes"),
 							callback = function() 
