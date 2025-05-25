@@ -82,14 +82,7 @@
 		},
 		{
 			"type" : "divider",
-			"size" : 16
-		},
-		{
-			"type" : "button",
-			"id" : "sbl_init_search_banlist",
-			"title" : "sbl_init_search_banlist_title",
-			"description" : "sbl_init_search_banlist_desc",
-			"callback" : "callback_sbl_init_search_banlist"
+			"size" : 24
 		},
 		{
 			"type" : "button",
@@ -100,6 +93,13 @@
 		},
 		{
 			"type" : "button",
+			"id" : "sbl_paste_ban",
+			"title" : "sbl_paste_ban_title",
+			"description" : "sbl_paste_ban_desc",
+			"callback" : "callback_sbl_paste_ban"
+		},
+		{
+			"type" : "button",
 			"id" : "sbl_manual_add_ban",
 			"title" : "sbl_manual_ban_title",
 			"description" : "sbl_manual_ban_desc",
@@ -107,14 +107,14 @@
 		},
 		{
 			"type" : "button",
-			"id" : "sbl_paste_ban",
-			"title" : "sbl_paste_ban_title",
-			"description" : "sbl_paste_ban_desc",
-			"callback" : "callback_sbl_paste_ban"
+			"id" : "sbl_init_search_banlist",
+			"title" : "sbl_init_search_banlist_title",
+			"description" : "sbl_init_search_banlist_desc",
+			"callback" : "callback_sbl_init_search_banlist"
 		},
 		{
 			"type" : "divider",
-			"size" : 4
+			"size" : 16
 		},
 		{
 			"type" : "button",
