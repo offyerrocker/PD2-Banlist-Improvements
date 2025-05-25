@@ -3,7 +3,7 @@
 	"description" : "Adds a menu to the Mod Options that will let you search for players by name or ID64, see recent players, and manually add them to your ban list.\nSome features require Quick Keyboard Input.",
 	"author" : "Offyerrocker",
 	"contact" : "Offyerrocker on MWS discord",
-	"version" : "3",
+	"version" : "4",
 	"blt_version" : 2,
 	"color" : "255 128 0",
 	"simple_dependencies" : {
