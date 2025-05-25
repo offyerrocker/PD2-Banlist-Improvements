@@ -1,6 +1,7 @@
 --todo
 -- clear recent players button
 -- clear all bans button
+-- disable recent player list (should also clear list)
 -- manual edit buttons for name/account id?
 
 _G.SearchableBanList = SearchableBanList or {}
@@ -258,7 +259,7 @@ Hooks:Add( "MenuManagerInitialize", "MenuManagerInitialize_SBL", function(menu_m
 					{
 						text = managers.localization:text("dialog_yes"),
 						callback = function() 
-							SearchableBanList:BanPlayerFromClipboard(identifier)
+							SearchableBanList:BanPlayerById(identifier)
 						end
 					},
 					{
@@ -280,72 +281,15 @@ Hooks:Add( "MenuManagerInitialize", "MenuManagerInitialize_SBL", function(menu_m
 		end
 	end
 	MenuCallbackHandler.callback_sbl_manual_add_ban = function(self)
-		if not managers.ban_list then 
-			SearchableBanList:OutputResultsToLog("[Searchable Ban List] Error 2: No ban list manager")
-			return
-		end
-		
 		if not _G.QuickKeyboardInput then 
 			SearchableBanList:ShowMissingQKIPrompt()
 			return
 		end
-		
-		local function clbk_identifier_entered(id)
-			
-			if not id or id == "" then
-				return
-			end
-			
-			local str_id = tostring(id)
-			
-			local name
-			if _G.Steam then
-				name = Steam:username(str_id)
-				-- this fetch will probably only succeed if you have recently played with this player,
-				-- or if the player is already on your friends list;
-				-- otherwise it will return "[unknown]"
-			end
-			
-			if not (name and name ~= "[unknown]") then
-				name = "[" .. str_id .. "]"
-			end 
-			
-			local success,err_code = SearchableBanList:BanPlayerById(id,name)
-			if success then
-				QuickMenu:new(managers.localization:text("sbl_manual_ban_success_title"),managers.localization:text("sbl_manual_ban_success_desc",
-						{
-							PLAYER_STRING = SearchableBanList:MakePlayerEntryString({
-								id=id,
-								name=name
-							})
-						}
-					),
-					{
-						text = managers.localization:text("dialog_ok"),
-						is_cancel_button = true
-					},
-					true
-				)
-			else
-				local err_title = managers.localization:text("sbl_dialog_failure",{code=err_code})
-				local err_msg = ""
-				if err_code == 1 then
-					err_msg = managers.localization:text("sbl_dialog_player_already_banned",{id=str_id})
-				end
-				QuickMenu:new(err_title,err_msg,
-					{
-						text = managers.localization:text("dialog_ok"),
-						is_cancel_button = true
-					},
-				true)
-				SearchableBanList:OutputResultsToLog(string.format("[Searchable Ban List] %s: %s",err_title,err_msg))
-				return
-			end
+		if not managers.ban_list then 
+			SearchableBanList:OutputResultsToLog("[Searchable Ban List] Error 2: No ban list manager")
+			return
 		end
-		
-		
-		
-		_G.QuickKeyboardInput:new(managers.localization:text("sbl_dialog_add_manual_ban_title"),managers.localization:text("sbl_dialog_add_manual_ban_desc"),"",clbk_identifier_entered,nil,true)
+		_G.QuickKeyboardInput:new(managers.localization:text("sbl_dialog_add_manual_ban_title"),managers.localization:text("sbl_dialog_add_manual_ban_desc"),"",callback(SearchableBanList,SearchableBanList,"BanPlayerById"),nil,true)
 	end
 	
 	MenuCallbackHandler.callback_sbl_init_search_banlist = function(self)
@@ -529,34 +473,7 @@ function SearchableBanList:ShowPlayerEntry(player_data,cb_back)
 						{
 							text = managers.localization:text("dialog_yes"),
 							callback = function() 
-								local success,err_code = SearchableBanList:BanPlayerById(identifier,name)
-								if success then
-									QuickMenu:new(managers.localization:text("sbl_manual_ban_success_title"),managers.localization:text("sbl_manual_ban_success_desc",
-											{
-												PLAYER_STRING = SearchableBanList:MakePlayerEntryString(player_data)
-											}
-										),
-										{
-											text = managers.localization:text("dialog_ok"),
-											is_cancel_button = true
-										},
-										true
-									)
-								else
-									local err_title = managers.localization:text("sbl_dialog_failure",{code=err_code})
-									local err_msg = ""
-									if err_code == 1 then
-										err_msg = managers.localization:text("sbl_dialog_player_already_banned",{id=tostring(identifier)})
-									end
-									QuickMenu:new(err_title,err_msg,
-										{
-											text = managers.localization:text("dialog_ok"),
-											is_cancel_button = true
-										},
-									true)
-									self:OutputResultsToLog(string.format("[Searchable Ban List] %s: %s",err_title,err_msg))
-									return
-								end
+								SearchableBanList:BanPlayerByIdName(identifier,name)
 							end
 						},
 						{
@@ -593,9 +510,36 @@ function SearchableBanList:GetPlayerEntryMacro(player_data)
 	}
 end
 
--- manually ban steam id or epic id
-function SearchableBanList:BanPlayerById(identifier,name)
-	local str_id = tostring(identifier)
+-- manually ban steam id or epic id;
+	-- automatically find this player's data in recent players, if it exists,
+	-- and fill in banned data with it
+	-- use this if you only have the identifier and name (eg from clipboard)
+function SearchableBanList:BanPlayerByIdName(identifier,name)
+	local success,err_code = self:_BanPlayerByIdName(identifier,name)
+	if success then
+		for _,player_data in pairs(self._recent_players) do 
+			if player_data.identifier == identifier or player_data.account_id == identifier then
+				
+				self:_BanPlayerData(table.deep_map_copy(player_data))
+				return success,err_code
+			end
+		end
+	end
+	
+	if string.find(identifier,"^7656") then
+		-- assume steam account if identifier appears to match id64 scheme
+		self:_BanPlayerData({
+			identifier = identifier,
+			platform = "STEAM",
+			name = Steam:username(identifier) -- most likely will return "[unknown]"
+		})
+	end
+	
+	return success,err_code
+end
+
+-- execute actual ban
+function SearchableBanList:_BanPlayerByIdName(identifier,name)
 	if managers.ban_list:banned(identifier) then
 		return false,1
 	else
@@ -605,15 +549,59 @@ function SearchableBanList:BanPlayerById(identifier,name)
 	end
 end
 
-function SearchableBanList:BanPlayerFromClipboard(identifier)
-	local name = identifier
+-- ban player, then apply extra data; use this if you have a full set of data already
+function SearchableBanList:BanPlayerData(player_data)
+	self:_BanPlayerByIdName(player_data.identifier,player_data.name)
+	self:_BanPlayerData(player_data)
+end
+
+-- apply extra data here
+function SearchableBanList:_BanPlayerData(player_data)
+	local identifier = player_data.identifier
+	
+	for _,data in pairs(managers.ban_list._global.banned) do 
+		if data.identifier == identifier then
+			-- overwritee the non-standard values (ie the ones the game did not set, but were set by the mod instead)
+			-- with the ones supplied from the caller; assume the caller is working with less stale info
+			data.name = player_data.name or data.name
+			if self.search_options.record_additional_ban_data then
+				data.account_id = player_data.account_id or nil
+				data.platform = player_data.platform
+			end
+			break
+		end
+	end
+	
+end
+
+-- ban player from only one piece of info (identifier)
+-- find or fill in the rest of the data from other sources as needed
+function SearchableBanList:BanPlayerById(identifier)
+	local name = "[unknown]"
 	local account_id = identifier
 	local platform
 		
 	-- ban them here to trigger the banlistmanager hook (for mod compatibility),
 	-- then go and edit the entry
-	local success,err_code = SearchableBanList:BanPlayerById(identifier,name)
-	if not success then
+	local success,err_code = self:BanPlayerByIdName(identifier,name)
+	if success then
+		for _,data in pairs(managers.ban_list._global.banned) do 
+			if data.identifier == identifier then
+				QuickMenu:new(managers.localization:text("sbl_manual_ban_success_title"),managers.localization:text("sbl_manual_ban_success_desc",
+						{
+							PLAYER_STRING = SearchableBanList:MakePlayerEntryString(data)
+						}
+					),
+					{
+						text = managers.localization:text("dialog_ok"),
+						is_cancel_button = true
+					},
+					true
+				)
+				break
+			end
+		end
+	else
 		local err_title = managers.localization:text("sbl_dialog_failure",{code=err_code})
 		local err_msg = ""
 		if err_code == 1 then
@@ -626,57 +614,8 @@ function SearchableBanList:BanPlayerFromClipboard(identifier)
 			}
 		},true)
 		self:OutputResultsToLog(string.format("[Searchable Ban List] %s: %s",err_title,err_msg))
-		return success
 	end
 	
-	-- check if the given player is in the recent players list already
-	-- if so, copy all relevant info to the new banlist entry
-	for _,v in pairs(SearchableBanList._recent_players) do 
-		if v.identifier == identifier or v.account_id == identifier then
-			name = v.name or "[no name]"
-			account_id = v.account_id or account_id
-			platform = v.platform
-			break
-		end
-	end
-	
-	-- check steam platform
-	if not platform then
-		if string.find(identifier,"^7656") then
-			-- assume steam account if identifier appears to match id64 scheme
-			platform = "STEAM"
-		end
-	end
-	--[[
-	if not (platform or name) then
-		local _name = Steam:username(account_id) 
-		if _name and name ~= "[unknown]" then
-			name = _name
-			platform = "STEAM"
-		end
-	end
-	--]]
-	
-	for _,data in pairs(managers.ban_list._global.banned) do 
-		if data.identifier == identifier then
-			data.account_id = account_id
-			data.platform = platform
-			-- get timestamp for success dialog
-			
-			QuickMenu:new(managers.localization:text("sbl_manual_ban_success_title"),managers.localization:text("sbl_manual_ban_success_desc",
-					{
-						PLAYER_STRING = SearchableBanList:MakePlayerEntryString(data)
-					}
-				),
-				{
-					text = managers.localization:text("dialog_ok"),
-					is_cancel_button = true
-				},
-				true
-			)
-			break
-		end
-	end
 	return success
 end
 
