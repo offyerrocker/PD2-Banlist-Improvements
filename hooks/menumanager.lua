@@ -567,6 +567,7 @@ function SearchableBanList:_BanPlayerData(player_data)
 			if self.search_options.record_additional_ban_data then
 				data.account_id = player_data.account_id or nil
 				data.platform = player_data.platform
+				data.timestamp = os.time() or nil
 			end
 			break
 		end
