@@ -1,8 +1,7 @@
 {
 	"menu_id" : "sbl_options",
-	"parent_menu_id" : "adv_options",
+	"parent_menu_id" : "blt_options",
 	"title" : "sbl_options_title",
-	"after" : "ban_list",
 	"items" : [
 		{
 			"type" : "toggle",

@@ -1,5 +1,5 @@
 {
-	"sbl_options_title" : "[Searchable Banlist Mod Options]"
+	"sbl_options_title" : "Banlist Improvements"
 	"sbl_is_case_sensitive_title" : "Case-Sensitive",
 	"sbl_is_case_sensitive_desc" : "If true, the search will distinguish between uppercase and lowercase letters.",
 	"sbl_require_match_all_title" : "Must Match All Keywords",
@@ -16,9 +16,9 @@
 	"sbl_show_id64s_desc" : "If true, displays the ID64 of each user in the search results.",
 	"sbl_log_results_title" : "Log results",
 	"sbl_log_results_desc" : "If true, logs the search results to the BLT log/console in your \"mods/logs/\" folder.",
-	"sbl_show_all_bans_title" : "List All Bans",
+	"sbl_show_all_bans_title" : "View Banned Players",
 	"sbl_show_all_bans_desc" : "Click to show all banned users.",
-	"sbl_show_all_recents_title" : "List All Recent Players",
+	"sbl_show_all_recents_title" : "View Recent Players",
 	"sbl_show_all_recents_desc" : "Click to show all players you've recently played with.",
 	"sbl_paste_ban_title" : "Add to Banlist from clipboard",
 	"sbl_paste_ban_desc" : "Click to paste a player id from your clipboard into the ban list.",
